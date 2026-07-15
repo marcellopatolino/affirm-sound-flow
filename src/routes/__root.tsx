@@ -7,10 +7,18 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { initI18n } from "../lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
+import { VoxLogo } from "@/components/vox-logo";
+import { LanguageSelector } from "@/components/language-selector";
+
+initI18n();
 
 function NotFoundComponent() {
   return (
@@ -77,14 +85,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "VoxAffirm — Áudios Subliminares Personalizados" },
+      { name: "description", content: "Crie áudios subliminares com afirmações, sons ambientes e frequências. Mixe ao vivo e baixe. Sua mente. Seu controle." },
+      { name: "author", content: "VoxAffirm" },
+      { property: "og:title", content: "VoxAffirm — Áudios Subliminares Personalizados" },
+      { property: "og:description", content: "Sua mente. Seu controle. Áudios subliminares personalizados baseados em neuroplasticidade." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -92,6 +99,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -119,8 +129,71 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <Header />
       <Outlet />
+      <Toaster theme="dark" position="top-center" richColors />
     </QueryClientProvider>
+  );
+}
+
+function Header() {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState<string | null>(null);
+  const [plan, setPlan] = useState<"free" | "pro">("free");
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      setEmail(data.user?.email ?? null);
+      if (data.user) {
+        supabase.from("profiles").select("plan").eq("user_id", data.user.id).maybeSingle()
+          .then(({ data: p }) => { if (mounted && p?.plan) setPlan(p.plan as "free" | "pro"); });
+      }
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        setEmail(session?.user?.email ?? null);
+      }
+    });
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
+  }, []);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+        <Link to="/" className="flex items-center gap-2">
+          <VoxLogo size={36} />
+          <span className="text-lg font-bold gold-text tracking-tight">VoxAffirm</span>
+        </Link>
+        <div className="ml-auto flex items-center gap-3">
+          <LanguageSelector />
+          {email ? (
+            <>
+              <Link to="/library" className="text-sm text-muted-foreground hover:text-foreground">
+                {t("nav_library")}
+              </Link>
+              {plan === "pro" && (
+                <span className="mono text-xs px-2 py-0.5 rounded gold-gradient text-primary-foreground font-semibold">
+                  {t("pro_badge")}
+                </span>
+              )}
+              <button onClick={signOut} className="text-sm text-muted-foreground hover:text-foreground">
+                {t("nav_logout")}
+              </button>
+            </>
+          ) : (
+            <Link to="/auth" className="text-sm px-3 py-1.5 rounded-md border border-primary/40 text-primary hover:bg-primary/10">
+              {t("nav_login")}
+            </Link>
+          )}
+        </div>
+      </div>
+    </header>
   );
 }
