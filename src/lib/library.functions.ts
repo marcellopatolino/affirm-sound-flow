@@ -30,7 +30,7 @@ export const saveLibraryItem = createServerFn({ method: "POST" })
         .from("library")
         .select("id", { count: "exact", head: true })
         .eq("user_id", context.userId);
-      if ((count ?? 0) >= 1) throw new Error("FREE_LIMIT_SAVED");
+      if ((count ?? 0) >= 1) return { saved: false, reason: "free_limit" };
     }
 
     const { data: row, error } = await context.supabase
@@ -39,8 +39,9 @@ export const saveLibraryItem = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
-    return row;
+    return { saved: true, item: row };
   });
+
 
 export const listLibrary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
