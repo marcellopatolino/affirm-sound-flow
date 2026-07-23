@@ -310,7 +310,7 @@ export function Generator({
               </div>
               <Button
                 className="w-full gold-gradient text-primary-foreground"
-                onClick={() => startCheckout().catch((e) => alert(e.message))}
+                onClick={() => startCheckout().catch((e: Error) => alert(e.message))}
               >
                 {t("plans_pro_cta")}
               </Button>
