@@ -96,7 +96,7 @@ export function Generator({
 
       if (isAuthed) {
         try {
-          await saveFn({
+          const res = await saveFn({
             data: {
               name: clean[0].slice(0, 60),
               affirmations: clean,
@@ -110,15 +110,19 @@ export function Generator({
               lang,
             },
           });
-          toast.success(t("gen_saved"));
-          onSaved?.();
-        } catch (err) {
-          if (err instanceof Error && err.message.includes("FREE_LIMIT_SAVED")) {
+          if (res.saved) {
+            toast.success(t("gen_saved"));
+            onSaved?.();
+          } else if (res.reason === "free_limit") {
             toast.warning(t("gen_free_limit_saved"));
           }
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Erro");
         }
       }
     } catch (err) {
+
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro");
     } finally {
