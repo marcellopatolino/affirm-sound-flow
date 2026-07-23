@@ -308,9 +308,12 @@ export function Generator({
                 />
                 <Button onClick={handleVerifyCode} variant="outline">{t("gen_activate")}</Button>
               </div>
-              <Link to="/auth" className="block">
-                <Button className="w-full gold-gradient text-primary-foreground">{t("plans_pro_cta")}</Button>
-              </Link>
+              <Button
+                className="w-full gold-gradient text-primary-foreground"
+                onClick={() => startCheckout().catch((e) => alert(e.message))}
+              >
+                {t("plans_pro_cta")}
+              </Button>
             </div>
           )}
         </Card>
