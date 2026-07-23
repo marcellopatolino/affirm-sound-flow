@@ -16,6 +16,7 @@ import { synthesizeSpeech } from "@/lib/tts.functions";
 import { saveLibraryItem } from "@/lib/library.functions";
 import { verifyCode } from "@/lib/pro.functions";
 import { limitsFor } from "@/lib/limits";
+import { startCheckout } from "@/lib/checkout";
 import type { Lang } from "@/lib/translations";
 import { Play, Pause, Download, Trash2, Plus, Lock, Sparkles } from "lucide-react";
 
@@ -308,9 +309,12 @@ export function Generator({
                 />
                 <Button onClick={handleVerifyCode} variant="outline">{t("gen_activate")}</Button>
               </div>
-              <Link to="/auth" className="block">
-                <Button className="w-full gold-gradient text-primary-foreground">{t("plans_pro_cta")}</Button>
-              </Link>
+              <Button
+                className="w-full gold-gradient text-primary-foreground"
+                onClick={() => startCheckout().catch((e: Error) => alert(e.message))}
+              >
+                {t("plans_pro_cta")}
+              </Button>
             </div>
           )}
         </Card>

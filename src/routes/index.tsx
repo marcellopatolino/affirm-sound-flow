@@ -7,6 +7,7 @@ import { VoxLogo } from "@/components/vox-logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pencil, Sliders, Download } from "lucide-react";
+import { startCheckout } from "@/lib/checkout";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -87,7 +88,12 @@ function Index() {
                 <div className="text-3xl font-bold gold-text mb-1">{t("plans_pro_price")}</div>
                 <div className="text-xs mono text-primary mb-3">{t("plans_pro_trial")}</div>
                 <p className="text-sm text-muted-foreground mb-4">{t("plans_pro_desc")}</p>
-                <Link to="/auth"><Button className="w-full gold-gradient text-primary-foreground">{t("plans_pro_cta")}</Button></Link>
+                <Button
+                  className="w-full gold-gradient text-primary-foreground"
+                  onClick={() => startCheckout().catch((e) => alert(e.message))}
+                >
+                  {t("plans_pro_cta")}
+                </Button>
               </Card>
             </div>
           </section>
