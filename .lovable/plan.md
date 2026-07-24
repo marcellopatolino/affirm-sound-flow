@@ -1,25 +1,46 @@
+## Migração para o seu Supabase próprio
 
-## Objetivo
-Criar o produto "VoxAffirm Pro" no Stripe com 3 preços mensais (BRL, USD, EUR), armazenar os price IDs nos secrets e confirmar o roteamento por idioma no checkout.
+Você quer sair do Lovable Cloud (Supabase gerenciado) e usar o projeto Supabase que você criou (`slrffcmquymrwidfzfft`). Antes de qualquer coisa, um aviso crítico e depois o plano.
 
-## Passos
+### AÇÃO URGENTE ANTES DE COMEÇAR
 
-1. **Criar produto + preço BRL** via `stripe--create_stripe_product_and_price`:
-   - `product_name`: "VoxAffirm Pro"
-   - `product_description`: "Assinatura mensal — áudios subliminares ilimitados, 120 min, downloads e prioridade."
-   - `price_amount`: 1990, `price_currency`: "brl", `recurring_interval`: "month"
+Você colou a `sb_secret_` no chat. Essa chave está comprometida. **Vá ao dashboard do seu Supabase → Settings → API → Rotate `secret` key AGORA.** Só me passe a nova depois via `add_secret` (form seguro), nunca colada no chat.
 
-2. **Criar preço USD** (mesmo produto, mas a tool cria produto novo por chamada — aceito, ou uso `stripe_api_write` para adicionar preços ao produto existente reaproveitando `product` id). Preferência: usar `stripe--stripe_api_write` (`PostPrices`) para criar os preços USD e EUR anexados ao mesmo `product` retornado no passo 1, evitando produtos duplicados. `unit_amount: 1990`, `currency: usd|eur`, `recurring[interval]: month`.
+### Realidade da migração
 
-3. **Armazenar secrets** via `secrets--set_secret`:
-   - `STRIPE_PRICE_BRL` = price_... (BRL)
-   - `STRIPE_PRICE_USD` = price_... (USD)
-   - `STRIPE_PRICE_EUR` = price_... (EUR)
+- Lovable Cloud não é "desconectável" deste projeto pela UI. O que dá para fazer é **sobrescrever a camada de integração** (`.env` + arquivos em `src/integrations/supabase/`) para apontar para o seu Supabase. O Cloud vira um backend órfão (você pode ignorar / pausar depois).
+- Todo o schema atual (`profiles`, `library`, `pro_codes`, `custom_sounds`, `user_roles`, function `has_role`, `handle_new_user`, `set_updated_at`, RLS, grants) precisa ser recriado no seu Supabase — o seu projeto está vazio.
+- Dados existentes no Cloud (se houver contas de teste, biblioteca, códigos pro) **não vêm junto** a menos que você exporte manualmente. Assumo que é reset limpo — me diga se não for.
+- Secrets do Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_BRL/USD/EUR`) e `LOVABLE_API_KEY` continuam no ambiente do Lovable e seguem funcionando. Só a camada Supabase muda.
 
-4. **Verificar roteamento por idioma**: `src/lib/translations.ts` já mapeia PT→BRL, EN→USD, ES→EUR (`STRIPE_PRICE_KEY_BY_LANG`), e `src/routes/api/public/stripe/checkout.ts` já seleciona o price pela moeda recebida e aplica `trial_period_days: 7`. Nada a alterar no código — apenas confirmar que o componente que chama o checkout envia `currency` derivado do idioma atual. Se não estiver, ajusto o call site do botão "Assinar Pro" para passar `currency: STRIPE_PRICE_KEY_BY_LANG[lang]`.
+### Passos do plano
 
-5. **Solicitar `STRIPE_WEBHOOK_SECRET`** (via `add_secret`) se ainda não configurado, para o webhook funcionar em produção. `APP_URL` é opcional (fallback usa `request.url`).
+1. **Você rotaciona a secret key** no dashboard Supabase e me confirma quando estiver pronto.
+2. **Salvar as novas credenciais** via `add_secret` (form seguro), nomes:
+   - `SUPABASE_URL` = `https://slrffcmquymrwidfzfft.supabase.co`
+   - `SUPABASE_PUBLISHABLE_KEY` = a `sb_publishable_...` (essa pode ir no `.env` também, é pública)
+   - `SUPABASE_SERVICE_ROLE_KEY` = a nova `sb_secret_...` (depois de rotacionada)
+3. **Recriar schema no seu Supabase.** Como as ferramentas de migration do Lovable escrevem no Cloud, eu vou gerar um único arquivo SQL (`supabase/migrations/0001_init.sql`) com tudo — tabelas, enum `app_role`, functions, triggers, RLS, GRANTs — para você **rodar manualmente** no SQL Editor do seu Supabase.
+4. **Reescrever `src/integrations/supabase/client.ts`, `client.server.ts`, `auth-middleware.ts`, `auth-attacher.ts`** para ler as novas variáveis (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` no browser; `process.env.SUPABASE_*` no server). Esses arquivos hoje são auto-gerados pelo Cloud; passam a ser "manuais".
+5. **Atualizar `.env`** com `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` apontando para o seu projeto.
+6. **Regenerar `src/integrations/supabase/types.ts`** — vou gerar tipos básicos manuais espelhando as tabelas do passo 3 (o gerador oficial requer CLI local; posso deixar um `types.ts` funcional).
+7. **Configurar Auth no seu Supabase (você faz no dashboard):**
+   - Email/password on, "Confirm email" off se quiser skip de confirmação.
+   - Google provider (Client ID/Secret) — precisa habilitar no dashboard, não dá pra automatizar sem tools do Cloud.
+   - Trigger `on_auth_user_created → handle_new_user` incluído no SQL do passo 3.
+8. **Webhook do Stripe** — a URL do webhook (`/api/public/stripe/webhook`) continua a mesma; só precisa garantir que ele grava em `pro_codes` no novo banco (já usa o client server).
+9. **Validar:** build, sign-up de teste, geração de áudio, checkout Stripe fake, admin.
 
-## Observações
-- Trial de 7 dias já está aplicado no handler de checkout — não precisa configurar no Stripe.
-- Um único produto com 3 preços é o padrão para multi-moeda; o Checkout usa o price passado por moeda detectada.
+### Riscos / trade-offs
+
+- Perde as tools do Lovable (`supabase--migration`, `supabase--insert`, `supabase--linter`, painel Cloud interno). Toda mudança futura de schema você faz colando SQL no dashboard do seu Supabase, e eu escrevo o SQL.
+- Perde o painel "Users" e "Storage" integrado do Cloud — usa o dashboard do Supabase direto.
+- Se o build falhar por algum arquivo auto-gerado ser regenerado pelo Cloud sobrescrevendo o meu, aviso e ajustamos.
+
+### Confirme para eu prosseguir
+
+Se estiver ok com esse caminho, responda com:
+1. "rotacionei" (depois de trocar a secret key no dashboard), e
+2. Se quer que eu inclua um seed de dados de exemplo ou não.
+
+Aí eu implemento os passos 3–6 de uma vez.
