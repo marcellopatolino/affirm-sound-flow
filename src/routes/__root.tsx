@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { initI18n } from "../lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { VoxLogo } from "@/components/vox-logo";
+import { AdminPanel } from "@/components/admin-panel";
 import { LanguageSelector } from "@/components/language-selector";
 
 initI18n();
@@ -115,16 +116,25 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Header />
+      <Outlet />
+      <Toaster theme="dark" position="top-center" richColors />
+      <AdminPanelWrapper />
+    </QueryClientProvider>
   );
 }
 
-function RootComponent() {
+function AdminPanelWrapper() {
+  const [email, setEmail] = useState<string | undefined>();
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined));
+  }, []);
+  return <AdminPanel userEmail={email} />;
+}
   const { queryClient } = Route.useRouteContext();
 
   return (
