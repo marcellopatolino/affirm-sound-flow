@@ -315,7 +315,12 @@ export function Generator({
               </div>
               <Button
                 className="w-full gold-gradient text-primary-foreground"
-                onClick={() => startCheckout().catch((e: Error) => alert(e.message))}
+                onClick={async () => {
+  const result = await startCheckout();
+  if (!result.ok) {
+    toast.error(result.error || "Erro ao iniciar pagamento. Tente novamente.");
+  }
+}}
               >
                 {t("plans_pro_cta")}
               </Button>
