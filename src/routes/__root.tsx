@@ -116,6 +116,13 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <Scripts />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
@@ -134,16 +141,6 @@ function AdminPanelWrapper() {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined));
   }, []);
   return <AdminPanel userEmail={email} />;
-}
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Header />
-      <Outlet />
-      <Toaster theme="dark" position="top-center" richColors />
-    </QueryClientProvider>
-  );
 }
 
 function Header() {

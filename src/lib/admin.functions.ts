@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/server";
+import { User } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const adminGetStats = createServerFn({ method: "GET" }).handler(async () => {
   const [
@@ -10,8 +11,8 @@ export const adminGetStats = createServerFn({ method: "GET" }).handler(async () 
   ] = await Promise.all([
     supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }),
     supabaseAdmin.from("profiles").select("*", { count: "exact", head: true }).eq("plan", "pro"),
-    supabaseAdmin.from("library_items").select("*", { count: "exact", head: true }),
-    supabaseAdmin.from("pro_codes").select("*", { count: "exact", head: true }).is("used_by", null),
+    supabaseAdmin.from("library").select("*", { count: "exact", head: true }),
+    supabaseAdmin.from("pro_codes").select("*", { count: "exact", head: true }).is("redeemed_by", null),
   ]);
   return { ok: true as const, stats: { totalUsers: totalUsers ?? 0, proUsers: proUsers ?? 0, totalItems: totalItems ?? 0, activeCoupons: activeCoupons ?? 0 } };
 });
@@ -19,15 +20,15 @@ export const adminGetStats = createServerFn({ method: "GET" }).handler(async () 
 export const adminListUsers = createServerFn({ method: "GET" }).handler(async () => {
   const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
   if (error) return { ok: false as const, error: error.message, users: [] };
-  const { data: profiles } = await supabaseAdmin.from("profiles").select("id, plan");
-  const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? []);
+  const { data: profiles } = await supabaseAdmin.from("profiles").select("user_id, plan");
+  const profileMap = new Map((profiles ?? []).map((p: { user_id: string; plan: string }) => [p.user_id, p]));
   return {
     ok: true as const,
-    users: data.users.map(u => ({
+    users: data.users.map((u: User) => ({
       id: u.id,
       email: u.email ?? "",
       created_at: u.created_at,
-      plan: (profileMap.get(u.id) as any)?.plan ?? "free",
+      plan: (profileMap.get(u.id) as { plan: string } | undefined)?.plan ?? "free",
     })),
   };
 });
@@ -35,7 +36,7 @@ export const adminListUsers = createServerFn({ method: "GET" }).handler(async ()
 export const adminSetPlan = createServerFn({ method: "POST" })
   .validator((d: { userId: string; plan: "free" | "pro" }) => d)
   .handler(async ({ data }) => {
-    const { error } = await supabaseAdmin.from("profiles").update({ plan: data.plan }).eq("id", data.userId);
+    const { error } = await supabaseAdmin.from("profiles").update({ plan: data.plan }).eq("user_id", data.userId);
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
   });
@@ -55,12 +56,11 @@ export const adminListCoupons = createServerFn({ method: "GET" }).handler(async 
 });
 
 export const adminCreateCoupon = createServerFn({ method: "POST" })
-  .validator((d: { code: string; maxUses: number; expiresAt?: string }) => d)
+  .validator((d: { code: string }) => d)
   .handler(async ({ data }) => {
     const { error } = await supabaseAdmin.from("pro_codes").insert({
       code: data.code.toUpperCase(),
-      max_uses: data.maxUses,
-      expires_at: data.expiresAt || null,
+      status: "active",
     });
     if (error) return { ok: false as const, error: error.message };
     return { ok: true as const };
