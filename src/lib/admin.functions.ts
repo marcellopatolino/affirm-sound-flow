@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/server";
+import { User } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 export const adminGetStats = createServerFn({ method: "GET" }).handler(async () => {
   const [
@@ -20,14 +21,14 @@ export const adminListUsers = createServerFn({ method: "GET" }).handler(async ()
   const { data, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
   if (error) return { ok: false as const, error: error.message, users: [] };
   const { data: profiles } = await supabaseAdmin.from("profiles").select("id, plan");
-  const profileMap = new Map(profiles?.map(p => [p.id, p]) ?? []);
+  const profileMap = new Map(profiles?.map((p: { id: string; plan: string }) => [p.id, p]) ?? []);
   return {
     ok: true as const,
-    users: data.users.map(u => ({
+    users: data.users.map((u: User) => ({
       id: u.id,
       email: u.email ?? "",
       created_at: u.created_at,
-      plan: (profileMap.get(u.id) as any)?.plan ?? "free",
+      plan: (profileMap.get(u.id) as { plan: string } | undefined)?.plan ?? "free",
     })),
   };
 });
