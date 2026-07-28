@@ -149,8 +149,6 @@ function CouponsTab() {
   const deleteFn = useServerFn(adminDeleteCoupon);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [code, setCode] = useState("");
-  const [maxUses, setMaxUses] = useState("1");
-  const [expiresAt, setExpiresAt] = useState("");
   const [creating, setCreating] = useState(false);
 
   const load = () => listFn({}).then(r => { if (r.ok) setCoupons(r.coupons); });
@@ -159,9 +157,9 @@ function CouponsTab() {
   const create = async () => {
     if (!code.trim()) return toast.error("Digite um código");
     setCreating(true);
-    const r = await createFn({ data: { code: code.trim(), maxUses: Number(maxUses), expiresAt: expiresAt || undefined } });
+    const r = await createFn({ data: { code: code.trim() } });
     setCreating(false);
-    if (r.ok) { toast.success("Cupom criado!"); setCode(""); setMaxUses("1"); setExpiresAt(""); load(); }
+    if (r.ok) { toast.success("Cupom criado!"); setCode(""); load(); }
     else toast.error(r.error);
   };
 
@@ -176,24 +174,21 @@ function CouponsTab() {
     <div className="space-y-4">
       <Card className="p-4 space-y-3">
         <p className="text-sm font-medium">Criar novo cupom</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="flex gap-2">
           <Input placeholder="CODIGO" value={code} onChange={e => setCode(e.target.value.toUpperCase())} className="mono" />
-          <Input type="number" placeholder="Usos máx." value={maxUses} onChange={e => setMaxUses(e.target.value)} min={1} />
-          <Input type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} />
         </div>
         <Button onClick={create} disabled={creating} className="w-full gold-gradient text-primary-foreground">
           {creating ? "Criando..." : "Criar cupom"}
         </Button>
       </Card>
       <div className="space-y-2">
-        {coupons.map(c => (
+        {coupons.map((c: any) => (
           <div key={c.code} className="flex items-center gap-2 p-3 rounded-lg border bg-card">
             <p className="mono text-sm font-medium flex-1">{c.code}</p>
             <span className="text-xs text-muted-foreground">
-              {c.used_by ? "Usado" : `${c.max_uses ?? "∞"} uso(s)`}
+              {c.redeemed_by ? "Usado" : "Ativo"}
             </span>
-            {c.expires_at && <span className="text-xs text-muted-foreground">Exp: {new Date(c.expires_at).toLocaleDateString("pt-BR")}</span>}
-            <Badge variant={c.used_by ? "secondary" : "default"}>{c.used_by ? "usado" : "ativo"}</Badge>
+            <Badge variant={c.redeemed_by ? "secondary" : "default"}>{c.redeemed_by ? "usado" : "ativo"}</Badge>
             <Button size="icon" variant="ghost" onClick={() => remove(c.code)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
         ))}
